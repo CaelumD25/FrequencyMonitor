@@ -15,7 +15,7 @@
 #include "../system/include/diag/trace.h"
 #include "../system/include/stm32f0-hal/stm32f0xx_hal_spi.h"
 
-#include "../provided_headers/stm32f051x8.h"
+//#include "../provided_headers/stm32f051x8.h"
 
 // TODO Consider imports, these have been commented out as repel doesn't
 // recognise roots from my knowledge
@@ -69,12 +69,19 @@
 /* Maximum possible setting for overflow */
 #define myTIM2_PERIOD ((uint32_t)0xFFFFFFFF)
 
+#define myTIM3_PRESCALER ((uint16_t)48000)
+/* Maximum possible setting for overflow */
+#define myTIM3_PERIOD ((uint32_t)0xFFFF)
+
+
 void myGPIOA_Init(void);
 void myGPIOB_Init(void);
 void mySPI_Init(void);
 void myTIM2_Init(void);
 void myTIM3_Init(void);
 void myEXTI_Init(void);
+void myADC_Init(void);
+void myDAC_Init(void);
 
 void oled_Write(unsigned char);
 void oled_Write_Cmd(unsigned char);
@@ -82,6 +89,9 @@ void oled_Write_Data(unsigned char);
 
 void oled_config(void);
 void refresh_OLED(void);
+
+// 1 = Function Generator, 0 = NE Timer
+int inSig = 1;
 
 // Declare/initialize your global variables here...
 // NOTE: You'll need at least one global variable
@@ -138,12 +148,17 @@ int main(int argc, char *argv[])
   myGPIOB_Init(); /* Initialize I/O port PB */
   myTIM2_Init();  /* Initialize timer TIM2 */
   myTIM3_Init();  /* Initialize timer TIM3 */
-
+  //oled_config(); // Init OLED
   myEXTI_Init(); /* Initialize EXTI */
-  oled_config(); // Init OLED
+  myADC_Init();
+  myDAC_Init();
+
 
   while (1) {
-    refresh_OLED();
+	  ADC1->CR |= 0b100;
+	  while((ADC1->ISR & ADC_ISR_EOC) != 0x4);
+	  DAC->DHR12R1 = ADC1->DR;
+	  //refresh_OLED(); // Read data here for ADC
   }
 
   return 0;
@@ -156,15 +171,16 @@ void myGPIOA_Init() {
 
   /* Configure PA0,1,2 as input */
   // Relevant register: GPIOA->MODER
-  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 | GPIO_MODER_MODER2);
+  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1) | GPIO_MODER_MODER2; // Changed to 11 (moved MODER2 out of not)
+
   /* Configure PA4,5 as output */
   // Relevant register: GPIOA->MODER
   GPIOA->MODER |= (GPIO_MODER_MODER4 | GPIO_MODER_MODER5);
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
-  GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2)
-                       GPIOA->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+  GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2);
+  GPIOA->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
 }
 
 void myGPIOB_Init() {
@@ -174,13 +190,46 @@ void myGPIOB_Init() {
 
   /* Configure PB3,4,5,6,7 as output */
   // Relevant register: GPIOB->MODER
-  GPIOB->MODER |= (GPIO_MODER_MODER3 | GPIO_MODER_MODER4 | GPIO_MODER_MODER5 |
-                   GPIO_MODER_MODER6 | GPIO_MODER_MODER7);
+  GPIOB->MODER |= 0b0101100110 << 0x4; // TODO Shifted by 4 or 6?
+
+
+		  //(GPIO_MODER_MODER3 | GPIO_MODER_MODER4 | GPIO_MODER_MODER5 |GPIO_MODER_MODER6 | GPIO_MODER_MODER7);
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
-  GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2)
-                       GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+  GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2);
+  GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+}
+
+void myADC_Init(){
+	RCC->APB2ENR |= RCC_APB2ENR_ADCEN;
+
+	ADC1->CR |= 0x01;
+
+	//ADC1-> x For registers
+	ADC1->SMPR |= 0x7;
+	// 1.221
+	ADC1->CHSELR |= 0x20; //bit 5 = 1
+
+	ADC1->CFGR1 |= 0b11 << 12; // 0b000 << 3 |
+
+
+	// DR read 0-11
+	// 100000
+	ADC1->CR |= 1;
+
+	//ADC1->IER |=  ADC_IER_ADRDYIE_Pos;
+	while((ADC1->ISR & ADC_ISR_ADRDY) != 0x1);
+
+	// TODO Done?
+	//ADC1->CR |= 0b001;
+	// Last
+}
+
+void myDAC_Init(){
+	RCC->APB1ENR |= RCC_APB1ENR_DACEN;
+
+	DAC->CR = 0b001;
 }
 
 void myTIM2_Init() {
@@ -236,13 +285,15 @@ void myTIM3_Init() {
   TIM3->EGR = ((uint16_t)0x0001);
 }
 
+
+
 void myEXTI_Init() {
   /* Map EXTI2 line to PA2 */
   // Relevant register: SYSCFG->EXTICR[0]
   // Enable interrupts from PA
-  SYSCFG->EXTICR[1] &= ~(0x000F); // user button
-  SYSCFG->EXTICR[1] &= ~(0x00F0); // timer
-  SYSCFG->EXTICR[1] &= ~(0x0F00); // function generation
+  SYSCFG->EXTICR[0] &= ~(0x000F); // user button and NE555 timer
+  SYSCFG->EXTICR[0] &= ~(0x00F0); // function generation
+ // SYSCFG->EXTICR[0] &= ~(0x0F00); // function generation
 
   /* EXTI2 line interrupts: set rising-edge trigger */
   // Relevant register: EXTI->RTSR
@@ -255,7 +306,7 @@ void myEXTI_Init() {
   // Relevant register: EXTI->IMR
   // Unmask interrupt requests from line 2
   EXTI->IMR |= 1;
-  EXTI->IMR |= 2;
+  EXTI->IMR &= ~(2); //masks NE timer
   EXTI->IMR |= 4;
 
   /* Assign EXTI2 interrupt priority = 0 in NVIC */
@@ -289,6 +340,52 @@ void TIM2_IRQHandler() {
 
 uint32_t count = 0;
 
+void EXTI0_1_IRQHandler(){
+
+	if ((EXTI->PR & EXTI_PR_PR0) != 0){
+		//code for frequency
+		while((GPIOA->IDR & 0x01)== 0x01);
+		trace_printf("\nButton!\n\n");
+		EXTI->IMR ^= 0x6;
+		inSig = !inSig;
+		count = 0;
+		EXTI->PR = 0x01;
+
+	}else{
+		//use inSig if prob
+
+		 if (count == 0) {
+		      // First edge
+		      TIM2->CNT = 0x00;         // Clear Timer
+		      TIM2->CR1 |= TIM_CR1_CEN; // start timer
+		      count++;
+		    } else {
+		      // Second edge
+		      TIM2->CR1 ^= (0x02);               // Stop Clock
+		      uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
+
+		      float period = ((float)time_elapsed) / ((float)48000000);
+		      float freq = ((float)1) / period;
+
+		      trace_printf(
+		          "*Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
+		          time_elapsed, freq, period, ADC1->DR * 1.221);
+		      count = 0;
+		      TIM2->CNT = 0x00;
+		    }
+
+
+
+		EXTI->PR = 0x02;
+	}
+
+
+
+
+
+
+}
+
 /* This handler is declared in system/src/cmsis/vectors_stm32f051x8.c */
 void EXTI2_3_IRQHandler() {
   // Declare/initialize your local variables here...
@@ -311,8 +408,8 @@ void EXTI2_3_IRQHandler() {
       float freq = ((float)1) / period;
 
       trace_printf(
-          "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f\n",
-          time_elapsed, freq, period);
+          "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
+          time_elapsed, freq, period, ADC1->DR * 1.221);
       count = 0;
       TIM2->CNT = 0x00;
     }

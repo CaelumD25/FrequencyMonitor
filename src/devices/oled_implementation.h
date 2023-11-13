@@ -277,36 +277,41 @@ unsigned char Characters[][8] = {
 
 void wait_ms(int ms) {
   TIM3->CNT = 0x00;
-  TIM3->CR = 0x01;
-  int end_cycle = ms * 48000; // s/1000ms * 48000000cycles/s
-  while (TIM3->CNT < end_cycle) {
+  int end_cycle = ms; // s/1,000ms * 48,000,000cycles/s
+  TIM3->CR1 = 0x01;
+  while (TIM3->CNT < end_cycle){
+	  //trace_printf("WAITING TIM3: %d | End Cycle: %d\n", TIM3->CNT, end_cycle);
   };
-  TIM3->CR = 0x02;
+  TIM3->CR1 = 0x02;
 }
 
 void oled_Write(unsigned char Value) {
-  /* TODO Wait until SPI1 is ready for writing (TXE = 1 in SPI1_SR) */
-  while ((SPI1->SR & 0x02) != 1)
-    ;
+  /* TODO Wait until SPI1 is ready for writing (TXE = 1 in SPI1_SR)  CUR ISSUE*/
+  while ((SPI1->SR & 0x02) != 0x2){
+	  //trace_printf("SPI SR: %x | %x\n", SPI1->SR, SPI1->DR);
+  };
+
 
   /* TODO Send one 8-bit character:
           - This function also sets BIDIOE = 1 in SPI1_CR1
   */
   HAL_SPI_Transmit(&SPI_Handle, &Value, 1, HAL_MAX_DELAY);
+  //trace_printf("SPI CR1: %x | CR2: %x \n", SPI1->CR1, SPI1->CR2);
+  wait_ms(10);
   /* TODO Wait until transmission is complete (TXE = 1 in SPI1_SR) */
-  while ((SPI1->SR & 0x02) != 1)
-    ;
+  while ((SPI1->SR & 0x02) != 0x02);
 }
 
 void oled_Write_Cmd(unsigned char cmd) {
   // TODO make PB6 = CS# = 1
   GPIOB->BSRR = GPIO_BSRR_BR_6;
   // TODO make PB7 = D/C# = 0
-  GPIOB->BRR = GPIO_BRR_BR_7;
+  GPIOB->BRR |= GPIO_BRR_BR_7;
   // TODO make PB6 = CS# = 0
-  GPIOB->BRR = GPIO_BRR_BR_6;
+  GPIOB->BRR |= GPIO_BRR_BR_6;
 
   oled_Write(cmd);
+
   // TODO make PB6 = CS# = 1
   GPIOB->BSRR = GPIO_BSRR_BR_6;
 }
@@ -324,19 +329,21 @@ void oled_Write_Data(unsigned char data) {
 }
 
 void oled_config(void) {
-  SPI_Handle.Instance = SPI1;
-  SPI_Handle.Init.Direction = SPI_DIRECTION_1LINE;
-  SPI_Handle.Init.Mode = SPI_MODE_MASTER;
-  SPI_Handle.Init.DataSize = SPI_DATASIZE_8BIT;
-  SPI_Handle.Init.CLKPolarity = SPI_POLARITY_LOW;
-  SPI_Handle.Init.CLKPhase = SPI_PHASE_1EDGE;
-  SPI_Handle.Init.NSS = SPI_NSS_SOFT;
-  SPI_Handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-  SPI_Handle.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  SPI_Handle.Init.CRCPolynomial = 7;
+	RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
 
-  HAL_SPI_Init(&SPI_Handle);
-  __HAL_SPI_ENABLE(&SPI_Handle);
+	SPI_Handle.Instance = SPI1;
+	SPI_Handle.Init.Direction = SPI_DIRECTION_1LINE;
+	SPI_Handle.Init.Mode = SPI_MODE_MASTER;
+	SPI_Handle.Init.DataSize = SPI_DATASIZE_8BIT;
+	SPI_Handle.Init.CLKPolarity = SPI_POLARITY_LOW;
+	SPI_Handle.Init.CLKPhase = SPI_PHASE_1EDGE;
+	SPI_Handle.Init.NSS = SPI_NSS_SOFT;
+	SPI_Handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+	SPI_Handle.Init.FirstBit = SPI_FIRSTBIT_MSB;
+	SPI_Handle.Init.CRCPolynomial = 7;
+
+	HAL_SPI_Init(&SPI_Handle);
+	__HAL_SPI_ENABLE(&SPI_Handle);
 
   /* TODO Reset LED Display (RES# = PB4):
           - make pin PB4 = 0, wait for a few ms
@@ -369,10 +376,10 @@ void oled_config(void) {
 void refresh_OLED(void) {
   // Buffer size = at most 16 characters per PAGE + terminating '\0'
   unsigned char Buffer[17];
-  uint32_t Res = 10;
+  //uint32_t Res = 10;
 
   // snprintf( Buffer, sizeof( Buffer ), "R: %5u Ohms", Res );
-  snprintf(Buffer, sizeof(Buffer), "Hello World!");
+  snprintf(Buffer, sizeof(Buffer), "Hello World!\0");
   /* Buffer now contains your character ASCII codes for LED Display
      - select PAGE (LED Display line) and set starting SEG (column)
      - for each c = ASCII code = Buffer[0], Buffer[1], ...,
@@ -383,7 +390,12 @@ void refresh_OLED(void) {
   oled_Write_Cmd(0x10);
   // TODO
   for (int i = 0; i < 17; i++) {
-    oled_Write_Data(Characters[Buffer[i]]);
+	  unsigned char buffer_content = Characters[Buffer[i]];
+	  trace_printf("%c\n", Buffer[i]);
+	  for (int j = 0; j < 8; j++){
+		  oled_Write_Data(Characters[Buffer[i]][j]);
+	  }
+
   }
 
   // snprintf( Buffer, sizeof( Buffer ), "F: %5u Hz", Freq );
@@ -404,7 +416,7 @@ void refresh_OLED(void) {
   /* Wait for ~100 ms (for example) to get ~10 frames/sec refresh rate
  - You should use TIM3 to implement this delay (e.g., via polling)
 */
-  wait_ms(1000);
+  wait_ms(100);
 
   // TODO
 }
