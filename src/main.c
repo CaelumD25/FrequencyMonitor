@@ -88,11 +88,11 @@ void oled_Write_Cmd(unsigned char);
 void oled_Write_Data(unsigned char);
 
 void oled_config(void);
-void refresh_OLED(void);
+void refresh_OLED(float);
 
 // 1 = Function Generator, 0 = NE Timer
 int inSig = 1;
-
+float freq;
 // Declare/initialize your global variables here...
 // NOTE: You'll need at least one global variable
 // (say, timerTriggered = 0 or 1) to indicate
@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
   myGPIOB_Init(); /* Initialize I/O port PB */
   myTIM2_Init();  /* Initialize timer TIM2 */
   myTIM3_Init();  /* Initialize timer TIM3 */
-  oled_config(); // Init OLED
+  oled_config(); // Initialize OLED
   myEXTI_Init(); /* Initialize EXTI */
   myADC_Init();
   myDAC_Init();
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 	  ADC1->CR |= 0b100;
 	  while((ADC1->ISR & ADC_ISR_EOC) != 0x4);
 	  DAC->DHR12R1 = ADC1->DR;
-	  refresh_OLED(); // Read data here for ADC
+	  refresh_OLED(freq); // Read data here for ADC
   }
 
   return 0;
@@ -189,7 +189,7 @@ void myGPIOB_Init() {
 
   /* Configure PB3,4,5,6,7 as output */
   // Relevant register: GPIOB->MODER
-  GPIOB->MODER |= 0b0101100110 << 0x4; // TODO Shifted by 4 or 6?
+  GPIOB->MODER |= 0b0101100110 << 0x6; // from lecture
 
 
 		  //(GPIO_MODER_MODER3 | GPIO_MODER_MODER4 | GPIO_MODER_MODER5 |GPIO_MODER_MODER6 | GPIO_MODER_MODER7);
@@ -362,7 +362,7 @@ void EXTI0_1_IRQHandler(){
 		      uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
 
 		      float period = ((float)time_elapsed) / ((float)48000000);
-		      float freq = ((float)1) / period;
+		      freq = ((float)1) / period;
 
 		      trace_printf(
 		          "*Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
@@ -402,7 +402,7 @@ void EXTI2_3_IRQHandler() {
       uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
 
       float period = ((float)time_elapsed) / ((float)48000000);
-      float freq = ((float)1) / period;
+      freq = ((float)1) / period;
 
       trace_printf(
           "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",

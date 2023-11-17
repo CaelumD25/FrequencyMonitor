@@ -287,9 +287,7 @@ void wait_ms(int ms) {
 
 void oled_Write(unsigned char Value) {
   /* TODO Wait until SPI1 is ready for writing (TXE = 1 in SPI1_SR)  CUR ISSUE*/
-  while ((SPI1->SR & 0x02) != 0x2){
-	  //trace_printf("SPI SR: %x | %x\n", SPI1->SR, SPI1->DR);
-  };
+  while ((SPI1->SR & 0x02) != 0x2){};
 
 
   /* TODO Send one 8-bit character:
@@ -376,25 +374,24 @@ void oled_config(void) {
           set starting SEG = 0
           call oled_Write_Data( 0x00 ) 128 times
   */
-  trace_printf("Start of loop");
-  for (int page = 0; page < 7; page++) {
+  for (int page = 0; page < 8; page++) {
     oled_Write_Cmd(0xB0 | page);
     oled_Write_Cmd(0x00);
     oled_Write_Cmd(0x10);
-    for (int i = 0; i < 128; i++) {
+    for (int i = 0; i < 130; i++) {
       oled_Write_Data(0x00);
     }
 
   }
-  trace_printf("End of loop");
 }
-void refresh_OLED(void) {
+void refresh_OLED(float freq) {
   // Buffer size = at most 16 characters per PAGE + terminating '\0'
   unsigned char Buffer[17];
   //uint32_t Res = 10;
 
-  // snprintf( Buffer, sizeof( Buffer ), "R: %5u Ohms", Res );
-  snprintf(Buffer, sizeof(Buffer), "Hello World!\0");
+  uint32_t tmp = EXTI->IMR;
+  snprintf( Buffer, sizeof( Buffer ), "R: %05.1f Ohms", ADC1->DR * 1.221);
+  //snprintf(Buffer, sizeof(Buffer), "Hello World!\0");
   /* Buffer now contains your character ASCII codes for LED Display
      - select PAGE (LED Display line) and set starting SEG (column)
      - for each c = ASCII code = Buffer[0], Buffer[1], ...,
@@ -405,10 +402,12 @@ void refresh_OLED(void) {
   oled_Write_Cmd(0x10);
   // TODO
   for (int i = 0; i < 17; i++) {
-	  //unsigned char buffer_content[] = Characters[Buffer[i]];
-	  //trace_printf("%c\n", Buffer[i]);
-	  //unsigned char buffer_content[] = {0b00001000, 0b00001000, 0b00101010, 0b00011100, 0b00001000, 0b00000000, 0b00000000, 0b00000000};
-	  oled_Write_Data(0xFF);
+	  tmp = EXTI->IMR;
+	  EXTI->IMR = 0x0000;
+	  for (int j = 0; j<8; j++){
+		  oled_Write_Data(Characters[(int) Buffer[i]][j]);
+	  }
+	  EXTI->IMR = tmp;
   }
 
   // snprintf( Buffer, sizeof( Buffer ), "F: %5u Hz", Freq );
@@ -417,14 +416,21 @@ void refresh_OLED(void) {
      - for each c = ASCII code = Buffer[0], Buffer[1], ...,
          send 8 bytes in Characters[c][0-7] to LED Display
   */
+  snprintf(Buffer, sizeof(Buffer), "F: %05.1f Hz", freq);
 
-  oled_Write_Cmd(0xB3);
+  oled_Write_Cmd(0xB4);
   oled_Write_Cmd(0x03);
   oled_Write_Cmd(0x10);
   // TODO
-  for (int i = 0; i < 17; i++) {
-    oled_Write_Data(0xFF);
-  }
+    for (int i = 0; i < 17; i++) {
+    tmp = EXTI->IMR;
+    EXTI->IMR = 0x0000;
+  	  for (int j = 0; j<8; j++){
+  		  oled_Write_Data(Characters[(int) Buffer[i]][j]);
+  	  }
+  	  EXTI->IMR = tmp;
+    }
+
 
   /* Wait for ~100 ms (for example) to get ~10 frames/sec refresh rate
  - You should use TIM3 to implement this delay (e.g., via polling)
