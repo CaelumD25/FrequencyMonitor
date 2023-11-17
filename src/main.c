@@ -364,9 +364,9 @@ void EXTI0_1_IRQHandler(){
 		      float period = ((float)time_elapsed) / ((float)48000000);
 		      freq = ((float)1) / period;
 
-		      trace_printf(
-		          "*Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
-		          time_elapsed, freq, period, ADC1->DR * 1.221);
+//		      trace_printf(
+//		          "*Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
+//		          time_elapsed, freq, period, ADC1->DR * 1.221);
 		      count = 0;
 		      TIM2->CNT = 0x00;
 		    }
@@ -404,9 +404,9 @@ void EXTI2_3_IRQHandler() {
       float period = ((float)time_elapsed) / ((float)48000000);
       freq = ((float)1) / period;
 
-      trace_printf(
-          "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
-          time_elapsed, freq, period, ADC1->DR * 1.221);
+//      trace_printf(
+//          "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
+//          time_elapsed, freq, period, ADC1->DR * 1.221);
       count = 0;
       TIM2->CNT = 0x00;
     }

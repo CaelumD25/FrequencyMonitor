@@ -387,10 +387,10 @@ void oled_config(void) {
 void refresh_OLED(float freq) {
   // Buffer size = at most 16 characters per PAGE + terminating '\0'
   unsigned char Buffer[17];
-  //uint32_t Res = 10;
+  unsigned char Buffer2[17];
 
   uint32_t tmp = EXTI->IMR;
-  snprintf( Buffer, sizeof( Buffer ), "R: %05.1f Ohms", ADC1->DR * 1.221);
+  snprintf( Buffer, sizeof(Buffer), "R: %05.0f Ohms\0", ADC1->DR * 1.221);
   //snprintf(Buffer, sizeof(Buffer), "Hello World!\0");
   /* Buffer now contains your character ASCII codes for LED Display
      - select PAGE (LED Display line) and set starting SEG (column)
@@ -416,7 +416,7 @@ void refresh_OLED(float freq) {
      - for each c = ASCII code = Buffer[0], Buffer[1], ...,
          send 8 bytes in Characters[c][0-7] to LED Display
   */
-  snprintf(Buffer, sizeof(Buffer), "F: %05.1f Hz", freq);
+  snprintf(Buffer2, sizeof(Buffer2), "F: %05.0f Hz\0", freq);
 
   oled_Write_Cmd(0xB4);
   oled_Write_Cmd(0x03);
@@ -426,7 +426,7 @@ void refresh_OLED(float freq) {
     tmp = EXTI->IMR;
     EXTI->IMR = 0x0000;
   	  for (int j = 0; j<8; j++){
-  		  oled_Write_Data(Characters[(int) Buffer[i]][j]);
+  		  oled_Write_Data(Characters[(int) Buffer2[i]][j]);
   	  }
   	  EXTI->IMR = tmp;
     }
