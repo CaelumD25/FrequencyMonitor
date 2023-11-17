@@ -300,32 +300,44 @@ void oled_Write(unsigned char Value) {
   wait_ms(10);
   /* TODO Wait until transmission is complete (TXE = 1 in SPI1_SR) */
   while ((SPI1->SR & 0x02) != 0x02);
+  while ((SPI1->SR & 0x80) == 0x80);
 }
 
 void oled_Write_Cmd(unsigned char cmd) {
   // TODO make PB6 = CS# = 1
-  GPIOB->BSRR = GPIO_BSRR_BR_6;
+//	GPIOB->BRR = GPIO_BRR_BR_6;
+//	GPIOB->BSRR = GPIO_BSRR_BS_7;
+//	GPIOB->BSRR = GPIO_BSRR_BS_6;
+
+  GPIOB->BSRR = GPIO_BSRR_BS_6;
   // TODO make PB7 = D/C# = 0
-  GPIOB->BRR |= GPIO_BRR_BR_7;
+  GPIOB->BRR = GPIO_BRR_BR_7;
   // TODO make PB6 = CS# = 0
-  GPIOB->BRR |= GPIO_BRR_BR_6;
+  GPIOB->BRR = GPIO_BRR_BR_6;
 
   oled_Write(cmd);
 
   // TODO make PB6 = CS# = 1
-  GPIOB->BSRR = GPIO_BSRR_BR_6;
+  GPIOB->BSRR = GPIO_BSRR_BS_6;
+//	GPIOB->BRR = GPIO_BRR_BR_6;
 }
 
 void oled_Write_Data(unsigned char data) {
   // TODO make PB6 = CS# = 1
   // TODO make PB7 = D/C# = 1
-  GPIOB->BSRR = GPIO_BSRR_BS_6 | GPIO_BSRR_BS_7;
+//	GPIOB->BRR = GPIO_BRR_BR_6;
+//	GPIOB->BRR = GPIO_BRR_BR_7;
+//	GPIOB->BSRR = GPIO_BSRR_BS_6;
+
+  GPIOB->BSRR = GPIO_BSRR_BS_6;
+  GPIOB->BSRR = GPIO_BSRR_BS_7;
   // TODO make PB6 = CS# = 0
   GPIOB->BRR = GPIO_BRR_BR_6;
 
   oled_Write(data);
   // TODO make PB6 = CS# = 1
   GPIOB->BSRR = GPIO_BSRR_BS_6;
+ // GPIOB->BRR = GPIO_BRR_BR_6;
 }
 
 void oled_config(void) {
@@ -350,9 +362,9 @@ void oled_config(void) {
           - make pin PB4 = 1, wait for a few ms
   */
   GPIOB->BRR = GPIO_BRR_BR_4;
-  wait_ms(500);
-  GPIOB->BSRR = GPIO_BSRR_BR_4;
-  wait_ms(500);
+  wait_ms(10);
+  GPIOB->BSRR = GPIO_BSRR_BS_4;
+  wait_ms(10);
 
   // Send initialization commands to LED Display
   for (unsigned int i = 0; i < sizeof(oled_init_cmds); i++) {
@@ -364,6 +376,7 @@ void oled_config(void) {
           set starting SEG = 0
           call oled_Write_Data( 0x00 ) 128 times
   */
+  trace_printf("Start of loop");
   for (int page = 0; page < 7; page++) {
     oled_Write_Cmd(0xB0 | page);
     oled_Write_Cmd(0x00);
@@ -371,7 +384,9 @@ void oled_config(void) {
     for (int i = 0; i < 128; i++) {
       oled_Write_Data(0x00);
     }
+
   }
+  trace_printf("End of loop");
 }
 void refresh_OLED(void) {
   // Buffer size = at most 16 characters per PAGE + terminating '\0'
@@ -390,12 +405,10 @@ void refresh_OLED(void) {
   oled_Write_Cmd(0x10);
   // TODO
   for (int i = 0; i < 17; i++) {
-	  unsigned char buffer_content = Characters[Buffer[i]];
-	  trace_printf("%c\n", Buffer[i]);
-	  for (int j = 0; j < 8; j++){
-		  oled_Write_Data(Characters[Buffer[i]][j]);
-	  }
-
+	  //unsigned char buffer_content[] = Characters[Buffer[i]];
+	  //trace_printf("%c\n", Buffer[i]);
+	  //unsigned char buffer_content[] = {0b00001000, 0b00001000, 0b00101010, 0b00011100, 0b00001000, 0b00000000, 0b00000000, 0b00000000};
+	  oled_Write_Data(0xFF);
   }
 
   // snprintf( Buffer, sizeof( Buffer ), "F: %5u Hz", Freq );
@@ -405,12 +418,12 @@ void refresh_OLED(void) {
          send 8 bytes in Characters[c][0-7] to LED Display
   */
 
-  oled_Write_Cmd(0xB2);
+  oled_Write_Cmd(0xB3);
   oled_Write_Cmd(0x03);
   oled_Write_Cmd(0x10);
   // TODO
   for (int i = 0; i < 17; i++) {
-    oled_Write_Data(Characters[Buffer[i]]);
+    oled_Write_Data(0xFF);
   }
 
   /* Wait for ~100 ms (for example) to get ~10 frames/sec refresh rate

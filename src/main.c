@@ -143,12 +143,11 @@ int main(int argc, char *argv[])
 
   trace_printf("This is the final part of the lab...\n");
   trace_printf("System clock: %u Hz\n", SystemCoreClock);
-
   myGPIOA_Init(); /* Initialize I/O port PA */
   myGPIOB_Init(); /* Initialize I/O port PB */
   myTIM2_Init();  /* Initialize timer TIM2 */
   myTIM3_Init();  /* Initialize timer TIM3 */
-  //oled_config(); // Init OLED
+  oled_config(); // Init OLED
   myEXTI_Init(); /* Initialize EXTI */
   myADC_Init();
   myDAC_Init();
@@ -158,7 +157,7 @@ int main(int argc, char *argv[])
 	  ADC1->CR |= 0b100;
 	  while((ADC1->ISR & ADC_ISR_EOC) != 0x4);
 	  DAC->DHR12R1 = ADC1->DR;
-	  //refresh_OLED(); // Read data here for ADC
+	  refresh_OLED(); // Read data here for ADC
   }
 
   return 0;
@@ -218,7 +217,6 @@ void myADC_Init(){
 	// 100000
 	ADC1->CR |= 1;
 
-	//ADC1->IER |=  ADC_IER_ADRDYIE_Pos;
 	while((ADC1->ISR & ADC_ISR_ADRDY) != 0x1);
 
 	// TODO Done?
@@ -228,7 +226,6 @@ void myADC_Init(){
 
 void myDAC_Init(){
 	RCC->APB1ENR |= RCC_APB1ENR_DACEN;
-
 	DAC->CR = 0b001;
 }
 
