@@ -292,7 +292,7 @@ void oled_Write(unsigned char Value) {
 					  //trace_printf("SPI CR1: %x | CR2: %x \n", SPI1->CR1, SPI1->CR2);
   wait_ms(10);
   while ((SPI1->SR & 0x02) != 0x02); //wait until transmission is complete (TXE = 1 in SPI1_SR) 
-  while ((SPI1->SR & 0x80) == 0x80); //
+  while ((SPI1->SR & 0x80) == 0x80); //wait for busy flag to clear 
 }
 
 void oled_Write_Cmd(unsigned char cmd) {
