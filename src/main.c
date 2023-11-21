@@ -90,9 +90,9 @@ void oled_Write_Data(unsigned char);
 void oled_config(void);
 void refresh_OLED(float);
 
-// 1 = Function Generator, 0 = NE Timer
+// 1 = Function Generator, 0 = NE355 Timer
 int inSig = 1;
-float freq;
+float freq; //stores frequency
 // Declare/initialize your global variables here...
 // NOTE: You'll need at least one global variable
 // (say, timerTriggered = 0 or 1) to indicate
@@ -302,9 +302,9 @@ void myEXTI_Init() {
   /* Unmask interrupts from EXTI2 line */
   // Relevant register: EXTI->IMR
   // Unmask interrupt requests from line 2
-  EXTI->IMR |= 1;
-  EXTI->IMR &= ~(2); //masks NE timer
-  EXTI->IMR |= 4;
+  EXTI->IMR |= 1; //allow interrupt from user button 
+  EXTI->IMR &= ~(2); //masks NE355 timer 
+  EXTI->IMR |= 4; //allow interrupts from function generator
 
   /* Assign EXTI2 interrupt priority = 0 in NVIC */
   // Relevant register: NVIC->IP[2], or use NVIC_SetPriority
