@@ -369,7 +369,8 @@ void refresh_OLED(float freq) {
   unsigned char Buffer[17]; //buffer used for resistance
   unsigned char Buffer2[17]; //buffer used for freqency
 
-  uint32_t tmp = EXTI->IMR; //get the current state of interrupt mask register
+  //uint32_t tmp = EXTI->IMR; //get the current state of interrupt mask register
+  snprintf(Buffer, sizeof(Buffer), "                \0");
   snprintf( Buffer, sizeof(Buffer), "R: %05.0f Ohms\0", ADC1->DR * 1.221); //ADC1->DR holds resistance data multiply by 1.221 to get Ohms
 
   /* Buffer now contains your character ASCII codes for LED Display
@@ -383,15 +384,15 @@ void refresh_OLED(float freq) {
   oled_Write_Cmd(0x10); //select upper segment
 
   for (int i = 0; i < 17; i++) {
-	  tmp = EXTI->IMR; //save the state
-	  EXTI->IMR = 0x0000; //disable interrupts
+	  //tmp = EXTI->IMR; //save the state
+	  //EXTI->IMR = 0x0001; //disable interrupts
 	  //write a character
 	  for (int j = 0; j<8; j++){
 		  oled_Write_Data(Characters[(int) Buffer[i]][j]);
 	  }
-	  EXTI->IMR = tmp; //restore state of interrupt mask
+	  //EXTI->IMR = tmp; //restore state of interrupt mask
   }
-
+  snprintf(Buffer2, sizeof(Buffer2), "                \0");
   snprintf(Buffer2, sizeof(Buffer2), "F: %05.0f Hz\0", freq);
   /* Buffer2 now contains character ASCII codes for LED Display
      - select PAGE (LED Display line) and set starting SEG (column)
@@ -403,14 +404,15 @@ void refresh_OLED(float freq) {
   oled_Write_Cmd(0x10); //select upper segment
 	
     for (int i = 0; i < 17; i++) {
-    tmp = EXTI->IMR; //save state
-    EXTI->IMR = 0x0000; //disable interrupts
+    //tmp = EXTI->IMR; //save state
+    //EXTI->IMR = 0x0001; //disable interrupts
 	    //write a character
   	  for (int j = 0; j<8; j++){
   		  oled_Write_Data(Characters[(int) Buffer2[i]][j]);
   	  }
-  	  EXTI->IMR = tmp; //restore state
+  	  //EXTI->IMR = tmp; //restore state
     }
+
 
   /* Wait for ~100 ms (for example) to get ~10 frames/sec refresh rate
  - You should use TIM3 to implement this delay (e.g., via polling)

@@ -29,6 +29,24 @@
 ░█▀▄░█▀▀░█▀█░█▀▄░░░█▄█░█▀▀
 ░█▀▄░█▀▀░█▀█░█░█░░░█░█░█▀▀
 ░▀░▀░▀▀▀░▀░▀░▀▀░░░░▀░▀░▀▀▀
+
+Typical Run:
+myGPIOA_Init();
+myGPIOB_Init();
+
+Ports:
+Directions Init
+Init inter
+
+myTIM2_Init();
+myTIM3_Init();
+oled_config();
+myEXTI_Init();
+myADC_Init();
+myDAC_Init();
+
+
+
  */
 // Decomposing devices into own sections
 // SPI and OLED Display, init and functions
@@ -90,6 +108,7 @@ void oled_Write_Data(unsigned char);
 void oled_config(void);
 void refresh_OLED(float);
 
+int Debug = 0;
 // 1 = Function Generator, 0 = NE355 Timer
 int inSig = 1;
 float freq; //stores frequency
@@ -156,6 +175,9 @@ int main(int argc, char *argv[])
   while (1) {
 	  ADC1->CR |= 0b100;
 	  while((ADC1->ISR & ADC_ISR_EOC) != 0x4);
+	  if (Debug) {
+		  trace_printf("%h", ADC1->DR);
+	  }
 	  DAC->DHR12R1 = ADC1->DR;
 	  refresh_OLED(freq); // Read data here for ADC
   }
@@ -164,6 +186,14 @@ int main(int argc, char *argv[])
 }
 
 void myGPIOA_Init() {
+	/*
+	 * Initializes Port A[x]
+	 * Enable Clock/Device for GPIOA
+	 * Configure Inputs then Outputs
+	 * Configure pull-up, pull-down
+	 *
+	 */
+
   /* Enable clock for GPIOA peripheral */
   // Relevant register: RCC->AHBENR
   RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
@@ -363,10 +393,11 @@ void EXTI0_1_IRQHandler(){
 
 		      float period = ((float)time_elapsed) / ((float)48000000);
 		      freq = ((float)1) / period;
+		      if (Debug){
+		    	  trace_printf("*Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
+		    	  		          time_elapsed, freq, period, ADC1->DR * 1.221);
+		      }
 
-//		      trace_printf(
-//		          "*Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
-//		          time_elapsed, freq, period, ADC1->DR * 1.221);
 		      count = 0;
 		      TIM2->CNT = 0x00;
 		    }
@@ -404,9 +435,11 @@ void EXTI2_3_IRQHandler() {
       float period = ((float)time_elapsed) / ((float)48000000);
       freq = ((float)1) / period;
 
-//      trace_printf(
-//          "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
-//          time_elapsed, freq, period, ADC1->DR * 1.221);
+      if (Debug){
+    	  trace_printf("Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f | Resistance: %f\n",
+    	            time_elapsed, freq, period, ADC1->DR * 1.221);
+      }
+
       count = 0;
       TIM2->CNT = 0x00;
     }
