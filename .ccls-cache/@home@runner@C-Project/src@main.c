@@ -15,7 +15,7 @@
 #include "../system/include/diag/trace.h"
 #include "../system/include/stm32f0-hal/stm32f0xx_hal_spi.h"
 
-#include "../provided_headers/stm32f051x8.h"
+//#include "../provided_headers/stm32f051x8.h"
 
 // TODO Consider imports, these have been commented out as repel doesn't
 // recognise roots from my knowledge
@@ -29,6 +29,22 @@
 ░█▀▄░█▀▀░█▀█░█▀▄░░░█▄█░█▀▀
 ░█▀▄░█▀▀░█▀█░█░█░░░█░█░█▀▀
 ░▀░▀░▀▀▀░▀░▀░▀▀░░░░▀░▀░▀▀▀
+
+Typical Run:
+myGPIOA_Init();
+myGPIOB_Init();
+
+Ports:
+Directions Init
+Init inter
+
+myTIM2_Init();
+myTIM3_Init();
+oled_config();
+myEXTI_Init();
+myADC_Init();
+myDAC_Init();
+
  */
 // Decomposing devices into own sections
 // SPI and OLED Display, init and functions
@@ -69,20 +85,30 @@
 /* Maximum possible setting for overflow */
 #define myTIM2_PERIOD ((uint32_t)0xFFFFFFFF)
 
+#define myTIM3_PRESCALER ((uint16_t)48000)
+/* Maximum possible setting for overflow */
+#define myTIM3_PERIOD ((uint32_t)0xFFFF)
+
 void myGPIOA_Init(void);
 void myGPIOB_Init(void);
 void mySPI_Init(void);
 void myTIM2_Init(void);
 void myTIM3_Init(void);
 void myEXTI_Init(void);
+void myADC_Init(void);
+void myDAC_Init(void);
 
 void oled_Write(unsigned char);
 void oled_Write_Cmd(unsigned char);
 void oled_Write_Data(unsigned char);
 
 void oled_config(void);
-void refresh_OLED(void);
+void refresh_OLED(float);
 
+int Debug = 0;
+// 1 = Function Generator, 0 = NE355 Timer
+int inSig = 1;
+float freq; // stores frequency
 // Declare/initialize your global variables here...
 // NOTE: You'll need at least one global variable
 // (say, timerTriggered = 0 or 1) to indicate
@@ -133,38 +159,51 @@ int main(int argc, char *argv[])
 
   trace_printf("This is the final part of the lab...\n");
   trace_printf("System clock: %u Hz\n", SystemCoreClock);
-
   myGPIOA_Init(); /* Initialize I/O port PA */
   myGPIOB_Init(); /* Initialize I/O port PB */
   myTIM2_Init();  /* Initialize timer TIM2 */
   myTIM3_Init();  /* Initialize timer TIM3 */
-
-  myEXTI_Init(); /* Initialize EXTI */
-  oled_config(); // Init OLED
+  oled_config();  /* Initialize OLED */
+  myEXTI_Init();  /* Initialize EXTI (external interrupts)*/
+  myADC_Init();   /* Initialize ADC */
+  myDAC_Init();   /* Initialize DAC */
 
   while (1) {
-    refresh_OLED();
+    ADC1->CR |= 0b100; // start ADC (set start bit to 1)
+    while ((ADC1->ISR & ADC_ISR_EOC) != 0x4)
+      ; // wait until ADC conversion is done
+    if (Debug) {
+      trace_printf("%h", ADC1->DR);
+    }
+    DAC->DHR12R1 =
+        ADC1->DR;       // reads data from ADC to DAC, clears EOC flag of ADC
+    refresh_OLED(freq); // sends frequency to oled and refreshes it
   }
 
   return 0;
 }
 
 void myGPIOA_Init() {
-  /* Enable clock for GPIOA peripheral */
-  // Relevant register: RCC->AHBENR
-  RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
 
-  /* Configure PA0,1,2 as input */
-  // Relevant register: GPIOA->MODER
-  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 | GPIO_MODER_MODER2);
-  /* Configure PA4,5 as output */
-  // Relevant register: GPIOA->MODER
-  GPIOA->MODER |= (GPIO_MODER_MODER4 | GPIO_MODER_MODER5);
+  RCC->AHBENR |= RCC_AHBENR_GPIOAEN; // Enable GPIOA clock
+
+  /*** move GPIO_MODER_MODER2?****/
+  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1) |
+                  GPIO_MODER_MODER2; // Configure PA0,1,2 as input
+
+  //  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 |
+  //  GPIO_MODER_MODER2);
+  // GPIOA->MODER |= 0b111100000000; //Configure PA0,1,2 as input, PA4,5 as
+  // analog Relevant register: GPIOA->MODER
+  GPIOA->MODER |=
+      (GPIO_MODER_MODER4 | GPIO_MODER_MODER5); // Configure PA4,5 as analog
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
-  GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2)
-                       GPIOA->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+  /********set to all 0s?*********/
+  // GPIOA->PUPDR &= 0x0000;
+  GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2);
+  GPIOA->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
 }
 
 void myGPIOB_Init() {
@@ -172,15 +211,40 @@ void myGPIOB_Init() {
   // Relevant register: RCC->AHBENR
   RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
 
-  /* Configure PB3,4,5,6,7 as output */
   // Relevant register: GPIOB->MODER
-  GPIOB->MODER |= (GPIO_MODER_MODER3 | GPIO_MODER_MODER4 | GPIO_MODER_MODER5 |
-                   GPIO_MODER_MODER6 | GPIO_MODER_MODER7);
+  GPIOB->MODER |= 0b0101100110
+                  << 0x6; // PB3 to be AF0, PB4 to be output, PB5 to be AF0, PB6
+                          // to be output, PB7 to be output
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
-  GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2)
-                       GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+  GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2);
+  GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+}
+
+void myADC_Init() {
+  RCC->APB2ENR |= RCC_APB2ENR_ADCEN; // Enable ADC clock
+
+  ADC1->CR |= 0x01; // Enable ADC via ADEN
+
+  // ADC1-> x For registers
+  ADC1->SMPR |= 0x7; // max clock cycles
+  // 1.221
+  ADC1->CHSELR |= 0x20; // bit 5 = 1 to select from PA5
+
+  ADC1->CFGR1 |=
+      0bg11 << 12; // set to continuous conversion mode on, register overwritten
+                   // with last conversion when overrun detected
+
+  ADC1->CR |= 1; // TODO remove?
+
+  while ((ADC1->ISR & ADC_ISR_ADRDY) != 0x1)
+    ; // wait til ADC ready flag = 1
+}
+
+void myDAC_Init() {
+  RCC->APB1ENR |= RCC_APB1ENR_DACEN; // Enable DAC clock
+  DAC->CR = 0b001;                   // enables DAC
 }
 
 void myTIM2_Init() {
@@ -192,7 +256,7 @@ void myTIM2_Init() {
   /* Configure TIM2: buffer auto-reload, count up, stop on overflow,
    * enable update events, interrupt on overflow only */
   // Relevant register: TIM2->CR1
-  TIM2->CR1 = (int16_t)0x008C; // 0x84; // 10000100
+  TIM2->CR1 = (int16_t)0x008C;
 
   /* Set clock prescaler value */
   TIM2->PSC = myTIM2_PRESCALER;
@@ -224,10 +288,10 @@ void myTIM3_Init() {
   /* Configure TIM3: buffer auto-reload, count up, stop on overflow,
    * enable update events, interrupt on overflow only */
   // Relevant register: TIM2->CR1
-  TIM3->CR1 = (int16_t)0x008C; // 0x84; // 10000100
+  TIM3->CR1 = (int16_t)0x008C;
 
   /* Set clock prescaler value */
-  TIM3->PSC = myTIM3_PRESCALER;
+  TIM3->PSC = myTIM3_PRESCALER; // changed clock counts to ms to avoid overflow
   /* Set auto-reloaded delay */
   TIM3->ARR = myTIM3_PERIOD;
 
@@ -240,31 +304,31 @@ void myEXTI_Init() {
   /* Map EXTI2 line to PA2 */
   // Relevant register: SYSCFG->EXTICR[0]
   // Enable interrupts from PA
-  SYSCFG->EXTICR[1] &= ~(0x000F); // user button
-  SYSCFG->EXTICR[1] &= ~(0x00F0); // timer
-  SYSCFG->EXTICR[1] &= ~(0x0F00); // function generation
+  SYSCFG->EXTICR[0] &= ~(0x000F); // user button and NE555 timer
+  SYSCFG->EXTICR[0] &= ~(0x00F0); // function generation
+  // SYSCFG->EXTICR[0] &= ~(0x0F00); // function generation
 
   /* EXTI2 line interrupts: set rising-edge trigger */
   // Relevant register: EXTI->RTSR
-  // Enabling the rising trigger for line 2
-  EXTI->RTSR |= 1;
-  EXTI->RTSR |= 2;
-  EXTI->RTSR |= 4;
+  // Enabling the rising trigger for input lines
+  EXTI->RTSR |= 1; // button rising edge
+  EXTI->RTSR |= 2; // NE555 rising edge
+  EXTI->RTSR |= 4; // fucntion generation rising edge
 
   /* Unmask interrupts from EXTI2 line */
   // Relevant register: EXTI->IMR
   // Unmask interrupt requests from line 2
-  EXTI->IMR |= 1;
-  EXTI->IMR |= 2;
-  EXTI->IMR |= 4;
+  EXTI->IMR |= 1;    // allow interrupt from user button
+  EXTI->IMR &= ~(2); // masks NE355 timer
+  EXTI->IMR |= 4;    // allow interrupts from function generator
 
-  /* Assign EXTI2 interrupt priority = 0 in NVIC */
+  /* Assign EXTI interrupt priority = 0 in NVIC */
   // Relevant register: NVIC->IP[2], or use NVIC_SetPriority
   // Set interrupt priority for line 2 and 3 to 0
   NVIC_SetPriority(EXTI0_1_IRQn, 0);
   NVIC_SetPriority(EXTI2_3_IRQn, 0);
 
-  /* Enable EXTI2 interrupts in NVIC */
+  /* Enable EXTI interrupts in NVIC */
   // Relevant register: NVIC->ISER[0], or use NVIC_EnableIRQ
   NVIC_EnableIRQ(EXTI0_1_IRQn);
   NVIC_EnableIRQ(EXTI2_3_IRQn);
@@ -287,16 +351,22 @@ void TIM2_IRQHandler() {
   }
 }
 
-uint32_t count = 0;
+uint32_t count = 0; // variable to track edges.
 
-/* This handler is declared in system/src/cmsis/vectors_stm32f051x8.c */
-void EXTI2_3_IRQHandler() {
-  // Declare/initialize your local variables here...
+void EXTI0_1_IRQHandler() {
 
-  /* Check if EXTI2 interrupt pending flag is indeed set */
-  if ((EXTI->PR & EXTI_PR_PR2) != 0) {
-    // Holds the program from execution while button button pressed
-    // while ((GPIOA->IDR & GPIO_IDR_0) !=0){}
+  if ((EXTI->PR & EXTI_PR_PR0) != 0) { // check if pending request is from PA0
+    // code for frequency
+    while ((GPIOA->IDR & 0x01) == 0x01)
+      ; // while button is still pressed
+    trace_printf("\nButton!\n\n");
+    EXTI->IMR ^=
+        0x6; // switch interrupt mask -- btwn NE555 and function generator
+    inSig = !inSig;  // track state
+    count = 0;       // reset count
+    EXTI->PR = 0x01; // clear pending interrupt
+
+  } else { // if here then interrupt is from PA1
     if (count == 0) {
       // First edge
       TIM2->CNT = 0x00;         // Clear Timer
@@ -308,33 +378,50 @@ void EXTI2_3_IRQHandler() {
       uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
 
       float period = ((float)time_elapsed) / ((float)48000000);
-      float freq = ((float)1) / period;
+      freq = ((float)1) / period;
+      if (Debug) {
+        trace_printf("*Time Elapsed(cycles): %u | Frequency(Hz): %f | "
+                     "Period(s): %f | Resistance: %f\n",
+                     time_elapsed, freq, period, ADC1->DR * 1.221);
+      }
 
-      trace_printf(
-          "Time Elapsed(cycles): %u | Frequency(Hz): %f | Period(s): %f\n",
-          time_elapsed, freq, period);
+      count = 0;
+      TIM2->CNT = 0x00; // Clear Timer
+    }
+
+    EXTI->PR = 0x02; // Clear pending interrupt by writing 1
+  }
+}
+
+/* This handler is declared in system/src/cmsis/vectors_stm32f051x8.c */
+void EXTI2_3_IRQHandler() {
+
+  /* Check if EXTI2 interrupt pending flag is indeed set */
+  if ((EXTI->PR & EXTI_PR_PR2) != 0) {
+
+    if (count == 0) {
+      // First edge
+      TIM2->CNT = 0x00;         // Clear Timer
+      TIM2->CR1 |= TIM_CR1_CEN; // start timer
+      count++;
+    } else {
+      // Second edge
+      TIM2->CR1 ^= (0x02);               // Stop Clock
+      uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
+
+      float period = ((float)time_elapsed) / ((float)48000000);
+      freq = ((float)1) / period;
+
+      if (Debug) {
+        trace_printf("Time Elapsed(cycles): %u | Frequency(Hz): %f | "
+                     "Period(s): %f | Resistance: %f\n",
+                     time_elapsed, freq, period, ADC1->DR * 1.221);
+      }
+
       count = 0;
       TIM2->CNT = 0x00;
     }
     EXTI->PR = 0x04;
-    //
-    // 1. If this is the first edge:
-    //	- Clear count register (TIM2->CNT).
-    //	- Start timer (TIM2->CR1).
-    //    Else (this is the second edge):
-    //	- Stop timer (TIM2->CR1).
-    //	- Read out count register (TIM2->CNT).
-    //	- Calculate signal period and frequency.
-    //	- Print calculated values to the console.
-    //	  NOTE: Function trace_printf does not work
-    //	  with floating-point numbers: you must use
-    //	  "unsigned int" type to print your signal
-    //	  period and frequency.
-    //
-    // 2. Clear EXTI2 interrupt pending flag (EXTI->PR).
-    // NOTE: A pending register (PR) bit is cleared
-    // by writing 1 to it.
-    //
   }
 }
 
