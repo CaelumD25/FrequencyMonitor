@@ -374,7 +374,7 @@ void oled_config(void) {
 void refresh_OLED(float freq) {
   // Buffer size = at most 16 characters per PAGE + terminating '\0'
   unsigned char Buffer[17];  // buffer used for resistance
-  unsigned char Buffer2[17]; // buffer used for freqency
+  unsigned char Buffer2[17]; // buffer used for frequency
 
   // uint32_t tmp = EXTI->IMR; //get the current state of interrupt mask
   // register

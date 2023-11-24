@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
       trace_printf("%h", ADC1->DR);
     }
     DAC->DHR12R1 = ADC1->DR; // reads data from ADC to DAC, clears EOC flag of ADC
-    refresh_OLED(freq); // sends frequency to oled and refreshes it
+    //refresh_OLED(freq); // sends frequency to oled and refreshes it
   }
 
   return 0;
@@ -186,15 +186,9 @@ void myGPIOA_Init() {
 
   RCC->AHBENR |= RCC_AHBENR_GPIOAEN; // Enable GPIOA clock
 
-  /*** move GPIO_MODER_MODER2?****/
-  // Configure PA0,1,2 as input
-  //GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 | GPIO_MODER_MODER2);
+  // Relevant register: GPIOA->MODER
+  GPIOA->MODER |= 0b111100000000; //Configure PA0,1,2 as input, PA4,5 as analog
 
-
-  //  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 |
-  //  GPIO_MODER_MODER2);
-  GPIOA->MODER |= 0b111100000000; //Configure PA0,1,2 as input, PA4,5 as analog Relevant register: GPIOA->MODER
-  //GPIOA->MODER |= (GPIO_MODER_MODER4 | GPIO_MODER_MODER5); // Configure PA4,5 as analog
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
@@ -345,12 +339,20 @@ uint32_t count = 0; // variable to track edges.
 void EXTI0_1_IRQHandler() {
 
   if ((EXTI->PR & EXTI_PR_PR0) != 0) { // check if pending request is from PA0
-    // code for frequency
-    while ((GPIOA->IDR & 0x01) == 0x01)
-      ; // while button is still pressed
-    trace_printf("\nButton!\n\n");
+
+    while ((GPIOA->IDR & 0x01) == 0x01); // while button is still pressed
+    // If inSig 1 = Function Generator, inSig 0 = NE555 Timer
+
+
     EXTI->IMR ^= 0x6; // switch interrupt mask -- btwn NE555 and function generator
     inSig = !inSig;  // track state
+
+    if (inSig){
+      	trace_printf("\nButton! Reading Function Generator  %d\n", inSig);
+    } else {
+       	trace_printf("\nButton! Reading NE555 Timer %d\n", inSig);
+    }
+
     count = 0;       // reset count
     EXTI->PR = 0x01; // clear pending interrupt
 
@@ -372,7 +374,7 @@ void EXTI0_1_IRQHandler() {
                      "Period(s): %f | Resistance: %f\n",
                      time_elapsed, freq, period, ADC1->DR * 1.221);
       }
-
+      refresh_OLED(freq);
       count = 0;
       TIM2->CNT = 0x00; // Clear Timer
     }
@@ -405,7 +407,7 @@ void EXTI2_3_IRQHandler() {
                      "Period(s): %f | Resistance: %f\n",
                      time_elapsed, freq, period, ADC1->DR * 1.221);
       }
-
+      refresh_OLED(freq);
       count = 0;
       TIM2->CNT = 0x00;
     }
