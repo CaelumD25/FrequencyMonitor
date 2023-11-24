@@ -34,16 +34,16 @@ Typical Run:
 myGPIOA_Init();
 myGPIOB_Init();
 
-Ports:
-Directions Init
-Init inter
-
 myTIM2_Init();
 myTIM3_Init();
 oled_config();
 myEXTI_Init();
 myADC_Init();
 myDAC_Init();
+
+Frequency Generator
+
+Timer Frequency
 
  */
 // Decomposing devices into own sections
@@ -175,8 +175,7 @@ int main(int argc, char *argv[])
     if (Debug) {
       trace_printf("%h", ADC1->DR);
     }
-    DAC->DHR12R1 =
-        ADC1->DR;       // reads data from ADC to DAC, clears EOC flag of ADC
+    DAC->DHR12R1 = ADC1->DR; // reads data from ADC to DAC, clears EOC flag of ADC
     refresh_OLED(freq); // sends frequency to oled and refreshes it
   }
 
@@ -188,22 +187,18 @@ void myGPIOA_Init() {
   RCC->AHBENR |= RCC_AHBENR_GPIOAEN; // Enable GPIOA clock
 
   /*** move GPIO_MODER_MODER2?****/
-  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1) |
-                  GPIO_MODER_MODER2; // Configure PA0,1,2 as input
+  // Configure PA0,1,2 as input
+  //GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 | GPIO_MODER_MODER2);
+
 
   //  GPIOA->MODER &= ~(GPIO_MODER_MODER0 | GPIO_MODER_MODER1 |
   //  GPIO_MODER_MODER2);
-  // GPIOA->MODER |= 0b111100000000; //Configure PA0,1,2 as input, PA4,5 as
-  // analog Relevant register: GPIOA->MODER
-  GPIOA->MODER |=
-      (GPIO_MODER_MODER4 | GPIO_MODER_MODER5); // Configure PA4,5 as analog
+  GPIOA->MODER |= 0b111100000000; //Configure PA0,1,2 as input, PA4,5 as analog Relevant register: GPIOA->MODER
+  //GPIOA->MODER |= (GPIO_MODER_MODER4 | GPIO_MODER_MODER5); // Configure PA4,5 as analog
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
-  /********set to all 0s?*********/
-  // GPIOA->PUPDR &= 0x0000;
-  GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2);
-  GPIOA->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+  GPIOA->PUPDR &= 0x0000;
 }
 
 void myGPIOB_Init() {
@@ -212,14 +207,12 @@ void myGPIOB_Init() {
   RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
 
   // Relevant register: GPIOB->MODER
-  GPIOB->MODER |= 0b0101100110
-                  << 0x6; // PB3 to be AF0, PB4 to be output, PB5 to be AF0, PB6
+  GPIOB->MODER |= 0b0101100110 << 0x6; // PB3 to be AF0, PB4 to be output, PB5 to be AF0, PB6
                           // to be output, PB7 to be output
 
-  /* Ensure no pull-up/pull-down for PA */
-  // Relevant register: GPIOA->PUPDR
-  GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPDR0 | GPIO_PUPDR_PUPDR1 | GPIO_PUPDR_PUPDR2);
-  GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR1); // GPIO_PUPDR_PUPDR2
+  /* Ensure no pull-up/pull-down for PB */
+  // Relevant register: GPIOB->PUPDR
+  GPIOB->PUPDR &= 0x0000;
 }
 
 void myADC_Init() {
@@ -232,14 +225,10 @@ void myADC_Init() {
   // 1.221
   ADC1->CHSELR |= 0x20; // bit 5 = 1 to select from PA5
 
-  ADC1->CFGR1 |=
-      0bg11 << 12; // set to continuous conversion mode on, register overwritten
+  ADC1->CFGR1 |= 0b11 << 12; // set to continuous conversion mode on, register overwritten
                    // with last conversion when overrun detected
 
-  ADC1->CR |= 1; // TODO remove?
-
-  while ((ADC1->ISR & ADC_ISR_ADRDY) != 0x1)
-    ; // wait til ADC ready flag = 1
+  while ((ADC1->ISR & ADC_ISR_ADRDY) != 0x1); // wait til ADC ready flag = 1
 }
 
 void myDAC_Init() {
@@ -360,8 +349,7 @@ void EXTI0_1_IRQHandler() {
     while ((GPIOA->IDR & 0x01) == 0x01)
       ; // while button is still pressed
     trace_printf("\nButton!\n\n");
-    EXTI->IMR ^=
-        0x6; // switch interrupt mask -- btwn NE555 and function generator
+    EXTI->IMR ^= 0x6; // switch interrupt mask -- btwn NE555 and function generator
     inSig = !inSig;  // track state
     count = 0;       // reset count
     EXTI->PR = 0x01; // clear pending interrupt
