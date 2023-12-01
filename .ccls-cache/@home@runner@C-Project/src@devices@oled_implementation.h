@@ -280,8 +280,7 @@ void wait_ms(int ms) {
   TIM3->CNT = 0x00;   // reset TIM3
   int end_cycle = ms; // s/1,000ms * 48,000,000cycles/s
   TIM3->CR1 = 0x01;   // start TIM3
-  while (TIM3->CNT < end_cycle) {
-  };
+  while (TIM3->CNT < end_cycle);
   TIM3->CR1 = 0x02; // stopping TIM3
 }
 
@@ -375,14 +374,13 @@ void oled_config(void) {
 void refresh_OLED(float freq) {
   // Buffer size = at most 16 characters per PAGE + terminating '\0'
   unsigned char Buffer[17];  // buffer used for resistance
-  unsigned char Buffer2[17]; // buffer used for freqency
+  unsigned char Buffer2[17]; // buffer used for frequency
 
   // uint32_t tmp = EXTI->IMR; //get the current state of interrupt mask
   // register
-  snprintf(Buffer, sizeof(Buffer),
-           "                \0"); // Clears Buffer
-                                  // ADC1->DR holds resistance data multiply
-                                  // by 1.221 to get Ohms
+  snprintf(Buffer, sizeof(Buffer),"                \0"); // Clears Buffer
+  // ADC1->DR holds resistance data multiply
+  // by 1.221 to get Ohms
   snprintf(Buffer, sizeof(Buffer), "R: %05.0f Ohms\0",
            ADC1->DR * 1.221); // Sets Buffer
 
@@ -396,7 +394,7 @@ void refresh_OLED(float freq) {
   oled_Write_Cmd(0x03); // select lower segment
   oled_Write_Cmd(0x10); // select upper segment
 
-  for (int i = 0; i < 17; i++) {
+  for (int i = 0; i < 16; i++) {
     // write a character
     for (int j = 0; j < 8; j++) {
       oled_Write_Data(
@@ -415,7 +413,7 @@ void refresh_OLED(float freq) {
   oled_Write_Cmd(0x03); // select lower segment
   oled_Write_Cmd(0x10); // select upper segment
 
-  for (int i = 0; i < 17; i++) {
+  for (int i = 0; i < 16; i++) {
     // write a character
     for (int j = 0; j < 8; j++) {
       oled_Write_Data(

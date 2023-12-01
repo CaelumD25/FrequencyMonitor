@@ -175,8 +175,9 @@ int main(int argc, char *argv[])
     if (Debug) {
       trace_printf("%h", ADC1->DR);
     }
-    DAC->DHR12R1 = ADC1->DR; // reads data from ADC to DAC, clears EOC flag of ADC
-    //refresh_OLED(freq); // sends frequency to oled and refreshes it
+    DAC->DHR12R1 =
+        ADC1->DR; // reads data from ADC to DAC, clears EOC flag of ADC
+    // refresh_OLED(freq); // sends frequency to oled and refreshes it
   }
 
   return 0;
@@ -187,8 +188,7 @@ void myGPIOA_Init() {
   RCC->AHBENR |= RCC_AHBENR_GPIOAEN; // Enable GPIOA clock
 
   // Relevant register: GPIOA->MODER
-  GPIOA->MODER |= 0b111100000000; //Configure PA0,1,2 as input, PA4,5 as analog
-
+  GPIOA->MODER |= 0b111100000000; // Configure PA0,1,2 as input, PA4,5 as analog
 
   /* Ensure no pull-up/pull-down for PA */
   // Relevant register: GPIOA->PUPDR
@@ -201,7 +201,8 @@ void myGPIOB_Init() {
   RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
 
   // Relevant register: GPIOB->MODER
-  GPIOB->MODER |= 0b0101100110 << 0x6; // PB3 to be AF0, PB4 to be output, PB5 to be AF0, PB6
+  GPIOB->MODER |= 0b0101100110
+                  << 0x6; // PB3 to be AF0, PB4 to be output, PB5 to be AF0, PB6
                           // to be output, PB7 to be output
 
   /* Ensure no pull-up/pull-down for PB */
@@ -219,10 +220,12 @@ void myADC_Init() {
   // 1.221
   ADC1->CHSELR |= 0x20; // bit 5 = 1 to select from PA5
 
-  ADC1->CFGR1 |= 0b11 << 12; // set to continuous conversion mode on, register overwritten
-                   // with last conversion when overrun detected
+  ADC1->CFGR1 |=
+      0b11 << 12; // set to continuous conversion mode on, register overwritten
+                  // with last conversion when overrun detected
 
-  while ((ADC1->ISR & ADC_ISR_ADRDY) != 0x1); // wait til ADC ready flag = 1
+  while ((ADC1->ISR & ADC_ISR_ADRDY) != 0x1)
+    ; // wait til ADC ready flag = 1
 }
 
 void myDAC_Init() {
@@ -340,17 +343,18 @@ void EXTI0_1_IRQHandler() {
 
   if ((EXTI->PR & EXTI_PR_PR0) != 0) { // check if pending request is from PA0
 
-    while ((GPIOA->IDR & 0x01) == 0x01); // while button is still pressed
+    while ((GPIOA->IDR & 0x01) == 0x01)
+      ; // while button is still pressed
     // If inSig 1 = Function Generator, inSig 0 = NE555 Timer
 
+    EXTI->IMR ^=
+        0x6; // switch interrupt mask -- btwn NE555 and function generator
+    inSig = !inSig; // track state
 
-    EXTI->IMR ^= 0x6; // switch interrupt mask -- btwn NE555 and function generator
-    inSig = !inSig;  // track state
-
-    if (inSig){
-      	trace_printf("\nButton! Reading Function Generator  %d\n", inSig);
+    if (inSig) {
+      trace_printf("\nButton! Reading Function Generator  %d\n", inSig);
     } else {
-       	trace_printf("\nButton! Reading NE555 Timer %d\n", inSig);
+      trace_printf("\nButton! Reading NE555 Timer %d\n", inSig);
     }
 
     count = 0;       // reset count
@@ -364,7 +368,7 @@ void EXTI0_1_IRQHandler() {
       count++;
     } else {
       // Second edge
-      TIM2->CR1 ^= (0x02);               // Stop Clock
+      TIM2->CR1 &= ~(TIM_CR1_CEN);       // Stop Clock
       uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
 
       float period = ((float)time_elapsed) / ((float)48000000);
@@ -396,7 +400,7 @@ void EXTI2_3_IRQHandler() {
       count++;
     } else {
       // Second edge
-      TIM2->CR1 ^= (0x02);               // Stop Clock
+      TIM2->CR1 &= ~(TIM_CR1_CEN);       // Stop Clock
       uint32_t time_elapsed = TIM2->CNT; // Reads count from clock
 
       float period = ((float)time_elapsed) / ((float)48000000);
