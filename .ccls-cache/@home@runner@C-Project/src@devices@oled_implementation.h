@@ -280,8 +280,9 @@ void wait_ms(int ms) {
   TIM3->CNT = 0x00;   // reset TIM3
   int end_cycle = ms; // s/1,000ms * 48,000,000cycles/s
   TIM3->CR1 = 0x01;   // start TIM3
-  while (TIM3->CNT < end_cycle);
-  TIM3->CR1 = 0x02; // stopping TIM3
+  while (TIM3->CNT < end_cycle)
+    ;
+  TIM3->CR1 &= ~(TIM_CR1_CEN); // stopping TIM3
 }
 
 /* oled_Write sends bytes to oled to be displayed*/
@@ -378,7 +379,7 @@ void refresh_OLED(float freq) {
 
   // uint32_t tmp = EXTI->IMR; //get the current state of interrupt mask
   // register
-  snprintf(Buffer, sizeof(Buffer),"                \0"); // Clears Buffer
+  snprintf(Buffer, sizeof(Buffer), "                \0"); // Clears Buffer
   // ADC1->DR holds resistance data multiply
   // by 1.221 to get Ohms
   snprintf(Buffer, sizeof(Buffer), "R: %05.0f Ohms\0",
